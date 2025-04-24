@@ -38,7 +38,7 @@
 *.i*86
 *.x86_64
 *.hex
-src/main/ncurses
+ncurses
 
 # Debug files
 *.dSYM/
