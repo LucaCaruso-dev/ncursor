@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #define MAX_STR_LEN 256
 
@@ -158,8 +159,8 @@ start:
     keypad(stdscr, TRUE);  // Abilita la lettura dei tasti speciali (come le frecce)
     noecho();              // Disabilita l'echo dei caratteri
     nodelay(stdscr, TRUE); // Rende getch() non bloccante
-    curs_set(0);          // Nasconde il cursore
-    
+    curs_set(0);           // Nasconde il cursore
+
     label1[0] = '\0';
     label2[0] = '\0';
     label3[0] = '\0';
@@ -196,7 +197,7 @@ start:
             printContent(2, 2, label3);
             printContent(2, 3, data.pwd);
             printContent(2, 4, label5);
-            printContent(2, 5, data.pwd);
+            printContent(2, 5, data.pwdConf);
             printContent(2, 6, label6);
             printContent(2, 7, "");
             switch (select)
@@ -225,6 +226,7 @@ start:
             isUpdated = false;
             continue; // No input
         }
+
         switch (ch)
         {
         case KEY_UP:
@@ -235,6 +237,8 @@ start:
             isUpdated = true;
             break;
         case KEY_DOWN:
+        case KEY_ENTER:
+        case 10:
             if (select < max_select)
             {
                 select++;
@@ -248,7 +252,8 @@ start:
         switch (select)
         {
         case 0: // Email
-            if (ch == KEY_BACKSPACE) {
+            if (ch == KEY_BACKSPACE)
+            {
                 if (strlen(data.email) > 0)
                 {
                     data.email[strlen(data.email) - 1] = '\0';
@@ -256,22 +261,50 @@ start:
                 }
                 break;
             }
-            else if (ch == KEY_ENTER)
+            if (!isprint(ch))
             {
-                select++;
-                isUpdated = true;
-                break;
-            }
-            if (!isprint(ch)) {
                 break;
             }
             strcat(data.email, (char *)&ch);
             isUpdated = true;
-
             break;
-
+        case 1: // Password
+            if (ch == KEY_BACKSPACE)
+            {
+                if (strlen(data.pwd) > 0)
+                {
+                    data.pwd[strlen(data.pwd) - 1] = '\0';
+                    isUpdated = true;
+                }
+                break;
+            }
+            if (!isprint(ch))
+            {
+                break;
+            }
+            strcat(data.pwd, (char *)&ch);
+            isUpdated = true;
+            break;
+        case 2: // Password Confirmation
+            if (ch == KEY_BACKSPACE)
+            {
+                if (strlen(data.pwdConf) > 0)
+                {
+                    data.pwdConf[strlen(data.pwdConf) - 1] = '\0';
+                    isUpdated = true;
+                }
+                break;
+            }
+            if (!isprint(ch))
+            {
+                break;
+            }
+            strcat(data.pwdConf, (char *)&ch);
+            isUpdated = true;
+            break;
         case 3: // save
-            if (ch == KEY_ENTER) {
+            if (ch == KEY_ENTER || ch == 10)
+            {
                 quit = true;
             }
             break;
