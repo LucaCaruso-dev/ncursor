@@ -30,6 +30,10 @@ char label6[MAX_STR_LEN];
 
 int x, y;
 FILE *LanFile;
+
+#define CSV_FILE "resources/saves.csv"
+FILE *CSV;
+
 int temp = 0;
 
 Data data;
@@ -45,10 +49,46 @@ Data data;
  * refresh();                       refresh the screen
  */
 
-void printContent(int x, int y, const char *str)
+void printContent(int xF, int yF, const char *str)
 {
-    mvprintw(y, x, "%s", str);
+
+    if (x < xF || y < yF)
+        return;
+    mvprintw(yF, xF, "%s", str);
     refresh();
+}
+
+bool writeCSV(bool save)
+{
+    /*
+     * Open the file resources/lan/saves.csv in append mode
+     * If the file is not found, print an error message and return false
+     */
+    CSV = fopen(CSV_FILE, "a");
+    if (CSV == NULL)
+    {
+        clear();
+        mvprintw(0, 0, "Error: File %s not found", CSV_FILE);
+        refresh();
+        return false;
+    }
+    if (save)
+        fprintf(CSV, "%s;%s\n", data.email, data.pwd);
+    fclose(CSV);
+    return true;
+}
+
+const char *readCSVFormat(char *line, int num)
+{
+    const char *tok;
+    for (tok = strtok(line, ";");
+         tok && *tok;
+         tok = strtok(NULL, ";\n"))
+    {
+        if (!--num)
+            return tok;
+    }
+    return NULL;
 }
 
 bool readProperties(FILE *File, const char *Key, char *Value)
@@ -81,7 +121,7 @@ bool readProperties(FILE *File, const char *Key, char *Value)
 bool setUpLan()
 {
     /*
-     * Open the file lan/%lan%.properties in read mode
+     * Open the file resources/lan/%lan%.properties in read mode
      * If the file is not found, print an error message and return false
      */
     char *lan = getenv("LANG");
@@ -89,7 +129,7 @@ bool setUpLan()
 
     int line = 0;
 
-    snprintf(filepath, sizeof(filepath), "lan/%.2s.properties", lan);
+    snprintf(filepath, sizeof(filepath), "resources/lan/%.2s.properties", lan);
     mvprintw(line++, 0, "Opening file %s", filepath);
     refresh();
 
@@ -97,8 +137,8 @@ bool setUpLan()
     if (LanFile == NULL)
     {
         mvprintw(line++, 0, "Error: File %s not found", filepath);
-        LanFile = fopen("lan/it.properties", "r");
-        mvprintw(line++, 0, "Opening file lan/it.properties");
+        LanFile = fopen("resources/lan/it.properties", "r");
+        mvprintw(line++, 0, "Opening file resources/lan/it.properties");
         refresh();
         if (LanFile == NULL)
         {
@@ -108,6 +148,8 @@ bool setUpLan()
             return false;
         }
     }
+
+    writeCSV(false);
 
     napms(1000); // Pausa di 1 secondo
 
@@ -179,6 +221,8 @@ start:
     int select = 0;
     int max_select = 3;
 
+    bool pwdMatch = true;
+
     bool isUpdated = true;
 
     while (!quit)
@@ -213,6 +257,12 @@ start:
             default:
                 break;
             }
+
+            if (!pwdMatch)
+            {
+                printContent(2, 8, "Password and Password Confirmation do not match");
+            }
+
             isUpdated = false;
         }
 
@@ -299,9 +349,15 @@ start:
             isUpdated = true;
             break;
         case 3: // save
-            if (ch == KEY_ENTER || ch == 10)
+            if ((ch == KEY_ENTER || ch == 10) && strcmp(data.pwd, data.pwdConf) == 0)
             {
+                writeCSV(true);
                 quit = true;
+            }
+            else if (strcmp(data.pwd, data.pwdConf) != 0)
+            {
+                pwdMatch = false;
+                isUpdated = true;
             }
             break;
         default:
