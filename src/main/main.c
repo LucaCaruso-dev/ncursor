@@ -262,7 +262,9 @@ start:
                 isUpdated = true;
                 break;
             }
-
+            if (!isprint(ch)) {
+                break;
+            }
             strcat(data.email, (char *)&ch);
             isUpdated = true;
 
