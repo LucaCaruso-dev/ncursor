@@ -3,10 +3,6 @@
  * Run with: ./ncurses
  */
 
-/*
- * Press 'q' to quit
- */
-
 #include <curses.h>
 #include <stdbool.h>
 #include <stdarg.h>
