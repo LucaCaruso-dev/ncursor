@@ -18,16 +18,18 @@
 
 struct Data
 {
-    char label1[MAX_STR_LEN];
-    char label2[MAX_STR_LEN];
-    char label3[MAX_STR_LEN];
-    char label4[MAX_STR_LEN];
-    char label5[MAX_STR_LEN];
-    char label6[MAX_STR_LEN];
     char email[MAX_STR_LEN];
     char pwd[MAX_STR_LEN];
+    char pwdConf[MAX_STR_LEN];
 };
 typedef struct Data Data;
+
+char label1[MAX_STR_LEN];
+char label2[MAX_STR_LEN];
+char label3[MAX_STR_LEN];
+char label4[MAX_STR_LEN];
+char label5[MAX_STR_LEN];
+char label6[MAX_STR_LEN];
 
 int x, y;
 FILE *LanFile;
@@ -132,12 +134,12 @@ bool setUpLan()
     char label5[MAX_STR_LEN] = "";
     char label6[MAX_STR_LEN] = "";*/
 
-    if (!readProperties(LanFile, "InsertEmail", data.label1) ||
-        !readProperties(LanFile, "Email", data.label2) ||
-        !readProperties(LanFile, "InsertPassword", data.label3) ||
-        !readProperties(LanFile, "Password", data.label4) ||
-        !readProperties(LanFile, "PasswordConfirmation", data.label5) ||
-        !readProperties(LanFile, "Login", data.label6))
+    if (!readProperties(LanFile, "InsertEmail", label1) ||
+        !readProperties(LanFile, "Email", label2) ||
+        !readProperties(LanFile, "InsertPassword", label3) ||
+        !readProperties(LanFile, "Password", label4) ||
+        !readProperties(LanFile, "PasswordConfirmation", label5) ||
+        !readProperties(LanFile, "Save", label6))
     {
         fclose(LanFile);
         return false;
@@ -156,15 +158,17 @@ start:
     keypad(stdscr, TRUE);  // Abilita la lettura dei tasti speciali (come le frecce)
     noecho();              // Disabilita l'echo dei caratteri
     nodelay(stdscr, TRUE); // Rende getch() non bloccante
-
-    data.label1[0] = '\0';
-    data.label2[0] = '\0';
-    data.label3[0] = '\0';
-    data.label4[0] = '\0';
-    data.label5[0] = '\0';
-    data.label6[0] = '\0';
+    curs_set(0);          // Nasconde il cursore
+    
+    label1[0] = '\0';
+    label2[0] = '\0';
+    label3[0] = '\0';
+    label4[0] = '\0';
+    label5[0] = '\0';
+    label6[0] = '\0';
     data.email[0] = '\0';
     data.pwd[0] = '\0';
+    data.pwdConf[0] = '\0';
 
     if (!setUpLan())
     {
@@ -178,37 +182,98 @@ start:
     int select = 0;
     int max_select = 3;
 
-    printContent(2, 0, data.label1);
-    printContent(2, 1, data.label2);
-    printContent(2, 2, data.label3);
-    printContent(2, 3, data.label4);
-    printContent(2, 4, data.label5);
-    printContent(2, 5, data.label6);
-    printContent(2, 6, "Press CTR+C to quit");
+    bool isUpdated = true;
 
     while (!quit)
     {
+        if (isUpdated)
+        {
+            // Clear the screen
+            clear();
+            // Print the labels
+            printContent(2, 0, label1);
+            printContent(2, 1, data.email);
+            printContent(2, 2, label3);
+            printContent(2, 3, data.pwd);
+            printContent(2, 4, label5);
+            printContent(2, 5, data.pwd);
+            printContent(2, 6, label6);
+            printContent(2, 7, "");
+            switch (select)
+            {
+            case 0: // Email
+                printContent(0, 1, "*");
+                break;
+            case 1: // Password
+                printContent(0, 3, "*");
+                break;
+            case 2: // Password Confirmation
+                printContent(0, 5, "*");
+                break;
+            case 3: // Login
+                printContent(0, 6, "*");
+                break;
+            default:
+                break;
+            }
+            isUpdated = false;
+        }
 
         int ch = getch();
-        switch (select)
+        if (ch == ERR)
         {
-        case 0:
-            
-            break;
+            isUpdated = false;
+            continue; // No input
         }
         switch (ch)
         {
-        case KEY_DOWN:
-            if (select < max_select)
-                select++;
-            else
-                select = 0;
-            break;
         case KEY_UP:
             if (select > 0)
+            {
                 select--;
-            else
-                select = max_select;
+            }
+            isUpdated = true;
+            break;
+        case KEY_DOWN:
+            if (select < max_select)
+            {
+                select++;
+            }
+            isUpdated = true;
+            break;
+        case 27: // Escape key
+            quit = true;
+            break;
+        }
+        switch (select)
+        {
+        case 0: // Email
+            if (ch == KEY_BACKSPACE) {
+                if (strlen(data.email) > 0)
+                {
+                    data.email[strlen(data.email) - 1] = '\0';
+                    isUpdated = true;
+                }
+                break;
+            }
+            else if (ch == KEY_ENTER)
+            {
+                select++;
+                isUpdated = true;
+                break;
+            }
+
+            strcat(data.email, (char *)&ch);
+            isUpdated = true;
+
+            break;
+
+        case 3: // save
+            if (ch == KEY_ENTER) {
+                quit = true;
+            }
+            break;
+        default:
             break;
         }
     }
