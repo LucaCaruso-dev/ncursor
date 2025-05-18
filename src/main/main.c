@@ -1,372 +1,264 @@
-/*
- * Compile with: gcc main.c -o ncurses -lncurses
- * Run with: ./ncurses
- */
-
 #include <curses.h>
-#include <stdbool.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <ctype.h>
+#include <string.h>
 
-#define MAX_STR_LEN 256
+#include "contatto.h"
+#include "csv.h"
 
-struct Data
-{
-    char email[MAX_STR_LEN];
-    char pwd[MAX_STR_LEN];
-    char pwdConf[MAX_STR_LEN];
-};
-typedef struct Data Data;
-
-char label1[MAX_STR_LEN];
-char label2[MAX_STR_LEN];
-char label3[MAX_STR_LEN];
-char label4[MAX_STR_LEN];
-char label5[MAX_STR_LEN];
-char label6[MAX_STR_LEN];
-
+#define MAX_STRLEN 100
 int x, y;
-FILE *LanFile;
 
-#define CSV_FILE "resources/saves.csv"
-FILE *CSV;
-
-int temp = 0;
-
-Data data;
-
-/*
- * for printing string in specified coordinates
- * x: x coordinate
- * y: y coordinate
- * string: str (with format specifiers)
- * ...: variable arguments
- *
- * mvprintw(y, x, str, ...);       print
- * refresh();                       refresh the screen
- */
-
-void printContent(int xF, int yF, const char *str)
+typedef struct Contatto
 {
-
-    if (x < xF || y < yF)
-        return;
-    mvprintw(yF, xF, "%s", str);
-    refresh();
-}
-
-bool writeCSV(bool save)
-{
-    /*
-     * Open the file resources/lan/saves.csv in append mode
-     * If the file is not found, print an error message and return false
-     */
-    CSV = fopen(CSV_FILE, "a");
-    if (CSV == NULL)
-    {
-        clear();
-        mvprintw(0, 0, "Error: File %s not found", CSV_FILE);
-        refresh();
-        return false;
-    }
-    if (save)
-        fprintf(CSV, "%s;%s\n", data.email, data.pwd);
-    fclose(CSV);
-    return true;
-}
-
-const char *readCSVFormat(char *line, int num)
-{
-    const char *tok;
-    for (tok = strtok(line, ";");
-         tok && *tok;
-         tok = strtok(NULL, ";\n"))
-    {
-        if (!--num)
-            return tok;
-    }
-    return NULL;
-}
-
-bool readProperties(FILE *File, const char *Key, char *Value)
-{
-    /*
-     * Read the file line by line
-     * If the line contains the key, extract the value and store it in data
-     * Return true if the key is found, false not found
-     * The file format is: %key% = %value%
-     *
-     * Please don't use char '=' in value
-     */
-    char Line[MAX_STR_LEN];
-    const char *Token = "=";
-    char *KeyFound;
-    while (fgets(Line, MAX_STR_LEN, File))
-    {
-        KeyFound = strtok(Line, Token);
-        if (strcmp(Line, Key) == 0)
-        {
-            // Value = strtok(NULL, Token);
-            strcpy(Value, strtok(NULL, Token));
-            // printContent(0, temp++, Value);
-            return true; // Key found
-        }
-    }
-    return false; // Key not found
-}
-
-bool setUpLan()
-{
-    /*
-     * Open the file resources/lan/%lan%.properties in read mode
-     * If the file is not found, print an error message and return false
-     */
-    char *lan = getenv("LANG");
-    char filepath[100];
-
-    int line = 0;
-
-    snprintf(filepath, sizeof(filepath), "resources/lan/%.2s.properties", lan);
-    mvprintw(line++, 0, "Opening file %s", filepath);
-    refresh();
-
-    LanFile = fopen(filepath, "r");
-    if (LanFile == NULL)
-    {
-        mvprintw(line++, 0, "Error: File %s not found", filepath);
-        LanFile = fopen("resources/lan/it.properties", "r");
-        mvprintw(line++, 0, "Opening file resources/lan/it.properties");
-        refresh();
-        if (LanFile == NULL)
-        {
-            mvprintw(line++, 0, "Error: File %s not found", filepath);
-            refresh();
-            napms(1000); // Pausa di 1 secondo
-            return false;
-        }
-    }
-
-    writeCSV(false);
-
-    napms(1000); // Pausa di 1 secondo
-
-    /*
-     * Data data;
-     * data.label1 = %InsertEmail%;
-     * data.label2 = %Email%;
-     * data.label3 = %InsertPassword%;
-     * data.label4 = %Password%;
-     * data.label5 = %PasswordConfirmation%;
-     * data.label6 = %Login%;
-     *
-     * data.email => userInput
-     * data.pwd => userInput
-     */
-
-    /*char label1[MAX_STR_LEN] = "";
-    char label2[MAX_STR_LEN] = "";
-    char label3[MAX_STR_LEN] = "";
-    char label4[MAX_STR_LEN] = "";
-    char label5[MAX_STR_LEN] = "";
-    char label6[MAX_STR_LEN] = "";*/
-
-    if (!readProperties(LanFile, "InsertEmail", label1) ||
-        !readProperties(LanFile, "Email", label2) ||
-        !readProperties(LanFile, "InsertPassword", label3) ||
-        !readProperties(LanFile, "Password", label4) ||
-        !readProperties(LanFile, "PasswordConfirmation", label5) ||
-        !readProperties(LanFile, "Save", label6))
-    {
-        fclose(LanFile);
-        return false;
-    }
-
-    fclose(LanFile);
-    return true;
-}
+    char nome[MAX_STRLEN];
+    char cognome[MAX_STRLEN];
+    char eta[MAX_STRLEN];
+    char numero[MAX_STRLEN];
+    char citta[MAX_STRLEN];
+} Contatto;
 
 int main()
 {
-start:
     initscr();              // Initialize the window
     getmaxyx(stdscr, x, y); // Get the maximum x & y coordinates
+    keypad(stdscr, TRUE);   // Abilita la lettura dei tasti speciali (come le frecce)
+    noecho();               // Disabilita l'echo dei caratteri
+    nodelay(stdscr, TRUE);  // Rende getch() non bloccante
+    curs_set(0);            // Nasconde il cursore
+    // start_color();
 
-    keypad(stdscr, TRUE);  // Abilita la lettura dei tasti speciali (come le frecce)
-    noecho();              // Disabilita l'echo dei caratteri
-    nodelay(stdscr, TRUE); // Rende getch() non bloccante
-    curs_set(0);           // Nasconde il cursore
-
-    label1[0] = '\0';
-    label2[0] = '\0';
-    label3[0] = '\0';
-    label4[0] = '\0';
-    label5[0] = '\0';
-    label6[0] = '\0';
-    data.email[0] = '\0';
-    data.pwd[0] = '\0';
-    data.pwdConf[0] = '\0';
-
-    if (!setUpLan())
-    {
-        endwin();
-        return 1;
-    }
-
-    clear();
-
-    bool quit = false;
+    bool search = true;
+    bool change = true;
+    bool home = true;
+    bool enter_down = false;
     int select = 0;
-    int max_select = 3;
+    bool quit = false;
 
-    bool pwdMatch = true;
-
-    bool isUpdated = true;
+    Contatto contatto;
 
     while (!quit)
     {
-        if (isUpdated)
+        char ch = getch();
+        if (home)
         {
-            // Clear the screen
             clear();
-            // Print the labels
-            printContent(2, 0, label1);
-            printContent(2, 1, data.email);
-            printContent(2, 2, label3);
-            printContent(2, 3, data.pwd);
-            printContent(2, 4, label5);
-            printContent(2, 5, data.pwdConf);
-            printContent(2, 6, label6);
-            printContent(2, 7, "");
-            switch (select)
-            {
-            case 0: // Email
-                printContent(0, 1, "*");
-                break;
-            case 1: // Password
-                printContent(0, 3, "*");
-                break;
-            case 2: // Password Confirmation
-                printContent(0, 5, "*");
-                break;
-            case 3: // Login
-                printContent(0, 6, "*");
-                break;
-            default:
-                break;
-            }
-
-            if (!pwdMatch)
-            {
-                printContent(2, 8, "Password and Password Confirmation do not match");
-            }
-
-            isUpdated = false;
+            change = true;
+            select = 0;
+            contatto.nome[0] = '\0';
+            contatto.cognome[0] = '\0';
+            contatto.eta[0] = '\0';
+            contatto.numero[0] = '\0';
+            contatto.citta[0] = '\0';
+            home = false;
         }
 
-        int ch = getch();
-        if (ch == ERR)
+        if (change)
         {
-            isUpdated = false;
-            continue; // No input
+            drawContent(select, contatto.nome, contatto.cognome, contatto.eta, contatto.numero, contatto.citta);
+            if (search)
+                searchButton();
+            else
+                addButton();
+            drawChangeModeButton();
+            drawExitButton();
+
+            change = false;
         }
 
+        if (ch == ERR)
+            continue;
+
+        // gestione tasti per movimento
         switch (ch)
         {
-        case KEY_UP:
-            if (select > 0)
-            {
-                select--;
-            }
-            isUpdated = true;
-            break;
         case KEY_DOWN:
-        case KEY_ENTER:
-        case 10:
-            if (select < max_select)
+        case 2:
+            if (search)
             {
-                select++;
+                switch (select)
+                {
+                case 0:
+                    select = 1;
+                    break;
+                case 1:
+                    select = 5;
+                    break;
+                case 5:
+                    select = 6;
+                    break;
+                case 6:
+                    select = 7;
+                    break;
+                case 7:
+                    select = 8;
+                    break;
+                default:
+                    select = 0;
+                    break;
+                }
             }
-            isUpdated = true;
+            else
+            {
+                if (select < 8)
+                    select++;
+            }
+            change = true;
             break;
-        case 27: // Escape key
-            quit = true;
+        case 10:
+            enter_down = true;
+            break;
+        case KEY_UP:
+        case 3:
+            if (search)
+            {
+                switch (select)
+                {
+                case 5:
+                    select = 1;
+                    break;
+                case 6:
+                    select = 5;
+                    break;
+                case 7:
+                    select = 6;
+                    break;
+                case 8:
+                    select = 7;
+                    break;
+                default:
+                    select = 0;
+                    break;
+                }
+            }
+            else
+            {
+                if (select)
+                    select--;
+            }
+            change = true;
             break;
         }
-        switch (select)
-        {
-        case 0: // Email
-            if (ch == KEY_BACKSPACE)
+
+        if (search)
+        { // cercare un contatto
+
+            if (ch == 7)
             {
-                if (strlen(data.email) > 0)
+                if (select == 0 && strlen(contatto.nome) > 0)
+                    contatto.nome[strlen(contatto.nome) - 1] = '\0';
+                if (select == 1 && strlen(contatto.cognome) > 0)
+                    contatto.cognome[strlen(contatto.cognome) - 1] = '\0';
+                change = true;
+            }
+            else if (isprint(ch))
+            {
+                char temp[2] = {ch, '\0'};
+                if (select == 0 && strlen(contatto.nome) < MAX_STRLEN - 1)
+                    strcat(contatto.nome, temp);
+                if (select == 1 && strlen(contatto.cognome) < MAX_STRLEN - 1)
+                    strcat(contatto.cognome, temp);
+                change = true;
+            }
+
+            if (enter_down)
+            {
+                if (select == 5)
                 {
-                    data.email[strlen(data.email) - 1] = '\0';
-                    isUpdated = true;
+                    if (!csv_find_contatto(
+                            contatto.nome,
+                            contatto.cognome,
+                            contatto.eta,
+                            contatto.numero,
+                            contatto.citta))
+                    {
+                        // contatto non trovato
+                        contatto.eta[0] = '\0';
+                        contatto.numero[0] = '\0';
+                        contatto.citta[0] = '\0';
+                    }
+                    refresh();
+                    napms(100);
+                    change = true;
                 }
-                break;
-            }
-            if (!isprint(ch))
-            {
-                break;
-            }
-            strcat(data.email, (char *)&ch);
-            isUpdated = true;
-            break;
-        case 1: // Password
-            if (ch == KEY_BACKSPACE)
-            {
-                if (strlen(data.pwd) > 0)
+                else if (select == 6)
                 {
-                    data.pwd[strlen(data.pwd) - 1] = '\0';
-                    isUpdated = true;
+                    home = true;
                 }
-                break;
-            }
-            if (!isprint(ch))
-            {
-                break;
-            }
-            strcat(data.pwd, (char *)&ch);
-            isUpdated = true;
-            break;
-        case 2: // Password Confirmation
-            if (ch == KEY_BACKSPACE)
-            {
-                if (strlen(data.pwdConf) > 0)
+                else if (select == 7)
                 {
-                    data.pwdConf[strlen(data.pwdConf) - 1] = '\0';
-                    isUpdated = true;
+                    home = true;
+                    search = false;
                 }
-                break;
+                else if (select == 8)
+                {
+                    quit = true;
+                }
+
+                enter_down = false;
             }
-            if (!isprint(ch))
+        }
+        else
+        { // aggiungere un contatto
+
+            if (ch == 7)
             {
-                break;
+                if (select == 0 && strlen(contatto.nome) > 0)
+                    contatto.nome[strlen(contatto.nome) - 1] = '\0';
+                if (select == 1 && strlen(contatto.cognome) > 0)
+                    contatto.cognome[strlen(contatto.cognome) - 1] = '\0';
+                if (select == 2 && strlen(contatto.eta) > 0)
+                    contatto.eta[strlen(contatto.eta) - 1] = '\0';
+                if (select == 3 && strlen(contatto.numero) > 0)
+                    contatto.numero[strlen(contatto.numero) - 1] = '\0';
+                if (select == 4 && strlen(contatto.citta) > 0)
+                    contatto.citta[strlen(contatto.citta) - 1] = '\0';
+                change = true;
             }
-            strcat(data.pwdConf, (char *)&ch);
-            isUpdated = true;
-            break;
-        case 3: // save
-            if ((ch == KEY_ENTER || ch == 10) && strcmp(data.pwd, data.pwdConf) == 0)
+            else if (isprint(ch))
             {
-                writeCSV(true);
-                quit = true;
+                char temp[2] = {ch, '\0'};
+                if (select == 0 && strlen(contatto.nome) < MAX_STRLEN - 1)
+                    strcat(contatto.nome, temp);
+                if (select == 1 && strlen(contatto.cognome) < MAX_STRLEN - 1)
+                    strcat(contatto.cognome, temp);
+                if (select == 2 && strlen(contatto.eta) < MAX_STRLEN - 1)
+                    strcat(contatto.eta, temp);
+                if (select == 3 && strlen(contatto.numero) < MAX_STRLEN - 1)
+                    strcat(contatto.numero, temp);
+                if (select == 4 && strlen(contatto.citta) < MAX_STRLEN - 1)
+                    strcat(contatto.citta, temp);
+                change = true;
             }
-            else if (strcmp(data.pwd, data.pwdConf) != 0)
+
+            if (enter_down)
             {
-                pwdMatch = false;
-                isUpdated = true;
+                if (select == 5)
+                {
+                    csv_save_contatto(contatto.nome,
+                                      contatto.cognome,
+                                      contatto.eta,
+                                      contatto.numero,
+                                      contatto.citta);
+                    home = true;
+                }
+                else if (select == 6)
+                {
+                    home = true;
+                }
+                else if (select == 7)
+                {
+                    home = true;
+                    search = true;
+                }
+                else if (select == 8)
+                {
+                    quit = true;
+                }
+                enter_down = false;
             }
-            break;
-        default:
-            break;
         }
     }
 
-end:
-    clear();
     endwin();
     return 0;
 }
